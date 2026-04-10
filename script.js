@@ -128,7 +128,7 @@ window.generateSelection = function() {
     }
 
     filteredApps = results.slice(0, totalQty);
-    renderTable(filteredApps);
+    renderTable(filteredApps, true);
 };
 
 // --- ФУНКЦИИ ВЫБОРА (ГЛОБАЛЬНЫЕ) ---
@@ -265,9 +265,24 @@ function populateGlobalTags() {
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
-function renderTable(data) {
+function renderTable(data, isSearchActive = false) {
     const tbody = document.getElementById('tableBody');
     document.getElementById('selected-total').innerText = data.length;
+
+    if (data.length === 0) {
+        // Если поиск был активен, но массив пуст — выводим "Нет в базе"
+        // Если поиск не активен (просто сброс), оставляем таблицу пустой
+        tbody.innerHTML = isSearchActive ? `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 16px;">
+                    <strong>Нет в базе</strong><br>
+                    <small>Приложение не найдено по вашему запросу</small>
+                </td>
+            </tr>
+        ` : '';
+        return;
+    }
+
     tbody.innerHTML = data.map(app => {
         const isIPhone = app.os === 'iphone' || app.os === 'ios' || app.os === 'phone';
         const dlDisplay = app.status === 'missing' ? "-" : (isIPhone ? "<i>Данные закрыты</i>" : app.downloads.toLocaleString());
@@ -304,27 +319,38 @@ window.clearExcelUpload = function() {
 };
 
 window.clearSearchText = function() {
-    // 1. Очищаем визуальное поле ввода
     const searchInput = document.getElementById('global-search');
     if (searchInput) searchInput.value = '';
 
-    // 2. Сбрасываем массив отфильтрованных данных
     filteredApps = [];
+    // Передаем false, чтобы не выводить "Нет в базе" при сбросе
+    renderTable([], false); 
 
-    // 3. Очищаем таблицу (передаем пустой массив)
-    renderTable([]);
-
-    // 4. Явно обнуляем счетчик в интерфейсе
     const selectedTotal = document.getElementById('selected-total');
     if (selectedTotal) selectedTotal.innerText = '0';
 };
 
 window.exportData = function() {
     if (filteredApps.length === 0) return alert("Список пуст");
-    const ws = XLSX.utils.json_to_sheet(filteredApps.map(a => ({
-        "Приложение": a.name, "Bundle": a.bundle, "ОС": a.os, "Загрузки": a.downloads
-    })));
+    
+    const dataToExport = filteredApps.map(a => {
+        // Проверяем, является ли устройство iPhone/iOS
+        const isIPhone = a.os === 'iphone' || a.os === 'ios' || a.os === 'phone';
+        
+        // Определяем значение для колонки загрузок
+        // Если это iPhone, пишем текст, иначе — количество загрузок
+        const downloadsValue = isIPhone ? "Данные закрыты App Store" : a.downloads;
+
+        return {
+            "Приложение": a.name,
+            "Ссылка": a.link,
+            "ОС": a.os,
+            "Загрузки": downloadsValue
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Apps");
-    XLSX.writeFile(wb, "Export.xlsx");
+    XLSX.writeFile(wb, "Export Apps.xlsx");
 };

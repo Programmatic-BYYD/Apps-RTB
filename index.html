@@ -68,27 +68,29 @@
 
         <div class="sidebar-section">
           <h3 class="section-label">Конструктор сегментов</h3>
-          <div class="control-group">
-            <label>Быстрый выбор тегов (вне категорий)</label>
-            <div class="custom-multiselect" id="global-tags-multiselect">
-              <div
-                class="select-box"
-                onclick="toggleMultiselect('global-tags-options', event)"
-              >
-                <span class="placeholder">Выберите теги...</span>
-                <span class="arrow">▼</span>
-              </div>
-              <div
-                class="options-container hidden"
-                id="global-tags-options"
-              ></div>
-            </div>
-          </div>
-          <hr class="separator" />
+
+          <!-- <hr class="separator" /> -->
           <div id="filter-rows-container"></div>
           <button class="btn-ghost" onclick="addFilterRow()">
             + Добавить категорию
           </button>
+        </div>
+
+        <div class="control-group">
+          <label>Быстрый выбор тегов (вне категорий)</label>
+          <div class="custom-multiselect" id="global-tags-multiselect">
+            <div
+              class="select-box"
+              onclick="toggleMultiselect('global-tags-options', event)"
+            >
+              <span class="placeholder">Выберите теги...</span>
+              <span class="arrow">▼</span>
+            </div>
+            <div
+              class="options-container hidden"
+              id="global-tags-options"
+            ></div>
+          </div>
         </div>
 
         <div class="sidebar-section footer-actions">
