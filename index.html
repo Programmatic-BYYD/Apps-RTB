@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>App Strategy Tool Pro</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <div class="dashboard">
+      <aside class="sidebar">
+        <div class="brand">RTB инвентарь <span></span></div>
+
+        <div class="sidebar-section">
+          <h3 class="section-label">Глобальные параметры</h3>
+          <div class="control-group">
+            <label>Платформа</label>
+            <div class="segmented-control">
+              <input type="radio" name="os" value="all" id="os-all" checked />
+              <label for="os-all">Все</label>
+              <input type="radio" name="os" value="Android" id="os-and" />
+              <label for="os-and">Android</label>
+              <input type="radio" name="os" value="Phone" id="os-ios" />
+              <label for="os-ios">iOS</label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label>Количество скачиваний</label>
+            <input
+              type="number"
+              id="min-dl"
+              placeholder="Напр: 1 000 000"
+              class="styled-input"
+            />
+          </div>
+
+          <div class="control-group">
+            <label>Возрастное ограничение</label>
+            <div class="custom-multiselect" id="age-multiselect">
+              <div
+                class="select-box"
+                onclick="toggleMultiselect('age-options', event)"
+              >
+                <span class="placeholder">Выберите возраст...</span>
+                <span class="arrow">▼</span>
+              </div>
+              <div class="options-container hidden" id="age-options"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 class="section-label">Массовая загрузка</h3>
+          <div class="control-group">
+            <label>Загрузить Excel с Bundle ID</label>
+            <input
+              type="file"
+              id="excel-upload"
+              accept=".xlsx, .xls"
+              class="styled-input"
+            />
+          </div>
+          <button class="btn-outline" onclick="clearExcelUpload()">
+            Убрать файл
+          </button>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 class="section-label">Конструктор сегментов</h3>
+          <div class="control-group">
+            <label>Быстрый выбор тегов (вне категорий)</label>
+            <div class="custom-multiselect" id="global-tags-multiselect">
+              <div
+                class="select-box"
+                onclick="toggleMultiselect('global-tags-options', event)"
+              >
+                <span class="placeholder">Выберите теги...</span>
+                <span class="arrow">▼</span>
+              </div>
+              <div
+                class="options-container hidden"
+                id="global-tags-options"
+              ></div>
+            </div>
+          </div>
+          <hr class="separator" />
+          <div id="filter-rows-container"></div>
+          <button class="btn-ghost" onclick="addFilterRow()">
+            + Добавить категорию
+          </button>
+        </div>
+
+        <div class="sidebar-section footer-actions">
+          <div class="control-group">
+            <label>Список Топ-приложений (количество)</label>
+            <input
+              type="number"
+              id="total-qty"
+              placeholder="Все"
+              class="styled-input"
+            />
+          </div>
+          <button class="btn-primary" onclick="generateSelection()">
+            Сформировать список
+          </button>
+          <button class="btn-outline" onclick="location.reload()">
+            Сбросить всё
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="top-nav">
+          <div class="search-section">
+            <div class="search-container">
+              <input
+                type="text"
+                id="global-search"
+                placeholder="Поиск по названию, Bundle или тегам..."
+              />
+              <button class="btn-search-action" onclick="generateSelection()">
+                Найти
+              </button>
+              <button class="btn-search-reset" onclick="clearSearchText()">
+                Очистить
+              </button>
+            </div>
+          </div>
+          <button class="btn-success" onclick="exportData()">
+            Выгрузить в Excel
+          </button>
+        </header>
+
+        <div class="content-header">
+          <div class="stats-cards">
+            <div class="stat-card">
+              <span class="stat-label">Всего в базе</span>
+              <strong class="stat-value" id="db-total">0</strong>
+            </div>
+            <div class="stat-card primary">
+              <span class="stat-label">Выбрано строк</span>
+              <strong class="stat-value" id="selected-total">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="mainTable">
+            <thead>
+              <tr>
+                <th>Приложение</th>
+                <th>ОС</th>
+                <th>Категория</th>
+                <th>Теги</th>
+                <th>Возраст</th>
+                <th style="text-align: right">Downloads</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
