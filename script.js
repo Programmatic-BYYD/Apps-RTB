@@ -21,9 +21,16 @@ async function init() {
         populateGlobalTags();
         addFilterRow(); 
         
-        renderTable([]); 
+        renderTable([], false); 
 
         document.getElementById('excel-upload').addEventListener('change', handleExcelUpload);
+
+        // Слушатель для поиска по нажатию Enter
+        document.getElementById('global-search').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                generateSelection();
+            }
+        });
 
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.custom-multiselect')) {
@@ -54,8 +61,6 @@ function parseCSV(csv) {
     }).filter(a => a.name);
 }
 
-// --- ГЛАВНАЯ ЛОГИКА ФИЛЬТРАЦИИ ---
-
 window.generateSelection = function() {
     const search = document.getElementById('global-search').value.toLowerCase().trim();
     const osFilter = document.querySelector('input[name="os"]:checked').value.toLowerCase();
@@ -74,7 +79,6 @@ window.generateSelection = function() {
         });
     } else {
         results = fullDatabase.filter(app => {
-            // 1. Поиск
             const allAppTags = app.tags.join(" ").toLowerCase();
             const mSearch = !search || 
                 app.name.toLowerCase().includes(search) || 
@@ -82,57 +86,91 @@ window.generateSelection = function() {
                 app.cat_ru.toLowerCase().includes(search) ||
                 allAppTags.includes(search);
 
-            // 2. Платформа (ОС)
             let mOS = (osFilter === 'all');
             if (!mOS) {
-                if (osFilter === 'phone') { // iOS
-                    mOS = (app.os === 'iphone' || app.os === 'ios' || app.os === 'phone');
-                } else if (osFilter === 'android') {
-                    mOS = (app.os === 'android');
-                }
+                if (osFilter === 'phone') { mOS = (app.os === 'iphone' || app.os === 'ios' || app.os === 'phone'); }
+                else if (osFilter === 'android') { mOS = (app.os === 'android'); }
             }
 
-            // 3. Загрузки
             const mDL = app.downloads >= minDL;
-
-            // 4. Возраст (Глобальный)
             const mAge = selectedAges.size === 0 || selectedAges.has(app.age);
-
-            // 5. Теги (Глобальные)
             const mGlobalTag = selectedGlobalTags.size === 0 || app.tags.some(t => selectedGlobalTags.has(t));
 
-            // 6. Конструктор сегментов (Карточки)
             let mSegment = true;
             const activeRows = Object.keys(rowCatSelections);
             if (activeRows.length > 0) {
-                // Если добавлены карточки, приложение должно подходить хотя бы под ОДНУ из них (логика ИЛИ)
                 mSegment = activeRows.some(rowId => {
                     const cats = rowCatSelections[rowId];
                     const tags = rowTagSelections[rowId];
-                    
-                    // Если карточка пустая, считаем что она не фильтрует
                     if (cats.size === 0 && tags.size === 0) return true;
-
                     const matchCat = cats.size === 0 || cats.has(app.cat_ru);
                     const matchTag = tags.size === 0 || app.tags.some(t => tags.has(t));
-                    
-                    // Внутри карточки логика И
                     return matchCat && matchTag;
                 });
             }
-
             return mSearch && mOS && mDL && mAge && mGlobalTag && mSegment;
         });
-
         results.sort((a, b) => b.downloads - a.downloads);
     }
 
     filteredApps = results.slice(0, totalQty);
-    renderTable(filteredApps, true);
+    renderTable(filteredApps, true); 
 };
 
-// --- ФУНКЦИИ ВЫБОРА (ГЛОБАЛЬНЫЕ) ---
+function renderTable(data, isSearchActive = false) {
+    const tbody = document.getElementById('tableBody');
+    document.getElementById('selected-total').innerText = data.length;
 
+    if (data.length === 0) {
+        tbody.innerHTML = isSearchActive ? `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 16px;">
+                    <strong>Нет в базе</strong><br>
+                    <small>Приложение не найдено по вашему запросу</small>
+                </td>
+            </tr>
+        ` : '';
+        return;
+    }
+
+    tbody.innerHTML = data.map(app => {
+        const isIPhone = app.os === 'iphone' || app.os === 'ios' || app.os === 'phone';
+        const dlDisplay = app.status === 'missing' ? "-" : (isIPhone ? "<i>Данные закрыты</i>" : app.downloads.toLocaleString());
+        return `
+            <tr>
+                <td><strong>${app.name}</strong><br><small style="color:gray">${app.bundle}</small></td>
+                <td style="text-transform: capitalize">${app.os}</td>
+                <td>${app.cat_ru}</td>
+                <td>${app.tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</td>
+                <td>${app.age}</td>
+                <td style="text-align:right">${dlDisplay}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.exportData = function() {
+    if (filteredApps.length === 0) return alert("Список пуст");
+    
+    const dataToExport = filteredApps.map(a => {
+        const isIPhone = a.os === 'iphone' || a.os === 'ios' || a.os === 'phone';
+        const downloadsValue = isIPhone ? "Данные закрыты App Store" : a.downloads;
+
+        return {
+            "Приложение": a.name,
+            "Ссылка": a.link, 
+            "ОС": a.os,
+            "Загрузки": downloadsValue
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Apps");
+    XLSX.writeFile(wb, "Export.xlsx");
+};
+
+// Вспомогательные функции UI (остаются без изменений)
 window.toggleAgeSelection = function(val, cb) {
     cb.checked ? selectedAges.add(val) : selectedAges.delete(val);
     updatePlaceholderText('age-multiselect', selectedAges, "Возраст");
@@ -142,8 +180,6 @@ window.toggleGlobalTag = function(val, cb) {
     cb.checked ? selectedGlobalTags.add(val) : selectedGlobalTags.delete(val);
     updatePlaceholderText('global-tags-multiselect', selectedGlobalTags, "Теги");
 };
-
-// --- КАРТОЧКИ СЕГМЕНТОВ ---
 
 window.addFilterRow = function() {
     const container = document.getElementById('filter-rows-container');
@@ -216,8 +252,6 @@ window.handleRowTag = function(rowId, tag, cb) {
     updatePlaceholderText(`${rowId}-ms`, rowTagSelections[rowId], "Теги");
 };
 
-// --- СЕРВИСНЫЕ ФУНКЦИИ UI ---
-
 window.toggleMultiselect = function(id, event) {
     if (event) event.stopPropagation();
     const target = document.getElementById(id);
@@ -263,42 +297,6 @@ function populateGlobalTags() {
     `).join('');
 }
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
-function renderTable(data, isSearchActive = false) {
-    const tbody = document.getElementById('tableBody');
-    document.getElementById('selected-total').innerText = data.length;
-
-    if (data.length === 0) {
-        // Если поиск был активен, но массив пуст — выводим "Нет в базе"
-        // Если поиск не активен (просто сброс), оставляем таблицу пустой
-        tbody.innerHTML = isSearchActive ? `
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 16px;">
-                    <strong>Нет в базе</strong><br>
-                    <small>Приложение не найдено по вашему запросу</small>
-                </td>
-            </tr>
-        ` : '';
-        return;
-    }
-
-    tbody.innerHTML = data.map(app => {
-        const isIPhone = app.os === 'iphone' || app.os === 'ios' || app.os === 'phone';
-        const dlDisplay = app.status === 'missing' ? "-" : (isIPhone ? "<i>Данные закрыты</i>" : app.downloads.toLocaleString());
-        return `
-            <tr>
-                <td><strong>${app.name}</strong><br><small style="color:gray">${app.bundle}</small></td>
-                <td style="text-transform: capitalize">${app.os}</td>
-                <td>${app.cat_ru}</td>
-                <td>${app.tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</td>
-                <td>${app.age}</td>
-                <td style="text-align:right">${dlDisplay}</td>
-            </tr>
-        `;
-    }).join('');
-}
-
 function handleExcelUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -321,36 +319,8 @@ window.clearExcelUpload = function() {
 window.clearSearchText = function() {
     const searchInput = document.getElementById('global-search');
     if (searchInput) searchInput.value = '';
-
     filteredApps = [];
-    // Передаем false, чтобы не выводить "Нет в базе" при сбросе
     renderTable([], false); 
-
     const selectedTotal = document.getElementById('selected-total');
     if (selectedTotal) selectedTotal.innerText = '0';
-};
-
-window.exportData = function() {
-    if (filteredApps.length === 0) return alert("Список пуст");
-    
-    const dataToExport = filteredApps.map(a => {
-        // Проверяем, является ли устройство iPhone/iOS
-        const isIPhone = a.os === 'iphone' || a.os === 'ios' || a.os === 'phone';
-        
-        // Определяем значение для колонки загрузок
-        // Если это iPhone, пишем текст, иначе — количество загрузок
-        const downloadsValue = isIPhone ? "Данные закрыты App Store" : a.downloads;
-
-        return {
-            "Приложение": a.name,
-            "Ссылка": a.link,
-            "ОС": a.os,
-            "Загрузки": downloadsValue
-        };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Apps");
-    XLSX.writeFile(wb, "Export Apps.xlsx");
 };
